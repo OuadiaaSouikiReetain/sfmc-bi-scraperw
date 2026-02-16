@@ -1,16 +1,22 @@
 name: BI XML → SFMC CSV
 
 on:
-  # Poll every 30 minutes — only processes if XML changed
+  # ✅ Déclenchement depuis SFMC (ton script POST /dispatches)
+  repository_dispatch:
+    types: [xml-uploaded]
+
+  # ✅ Déclenchement manuel depuis l'UI GitHub
+  workflow_dispatch:
+
+  # ✅ Optionnel : polling toutes les 30 minutes
+  # (garde-le seulement si tu veux une sécurité en plus)
   schedule:
     - cron: "*/30 * * * *"
-
-  # Manual trigger anytime
-  workflow_dispatch:
 
 jobs:
   convert:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,9 +27,11 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install paramiko
+        run: |
+          python -m pip install --upgrade pip
+          pip install paramiko
 
-      - name: Run XML → CSV converter
+      - name: Run XML → CSV converter (SFTP)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_PORT: ${{ secrets.FTP_PORT }}
