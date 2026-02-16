@@ -31,7 +31,7 @@ FTP_USERNAME = os.environ.get("FTP_USERNAME",  "536005700_7")
 FTP_PASSWORD = os.environ.get("FTP_PASSWORD",  "")
 
 FILENAME         = "PartenaireBI.xml"
-CSV_UPLOAD_PATH  = "PartenaireBI.csv"
+CSV_UPLOAD_PATH  = "Import/PartenaireBI.csv"
 
 
 
