@@ -13,14 +13,20 @@ import paramiko
 
 
 # =============================================================================
-# CONFIG (ajoute ça en haut)
+# CONFIG
 # =============================================================================
+FTP_HOST     = os.environ.get("FTP_HOST",     "mct8vv9h4h0gy1x8xmv8np06rlpy.ftp.marketingcloudops.com")
+FTP_PORT     = int(os.environ.get("FTP_PORT",  "22"))
+FTP_USERNAME = os.environ.get("FTP_USERNAME",  "536005700_7")
+FTP_PASSWORD = os.environ.get("FTP_PASSWORD",  "")
+
 INCOMING_DIR   = os.environ.get("INCOMING_DIR", "/bi/incoming")
 OUT_DIR        = os.environ.get("OUT_DIR",      "/bi/out")
 ARCHIVE_DIR    = os.environ.get("ARCHIVE_DIR",  "/bi/archive")
 PROCESSED_LOG  = os.environ.get("PROCESSED_LOG","/bi/processed/processed.log")
 
 XML_PATTERN = re.compile(r".*\.xml$", re.IGNORECASE)
+
 
 def utc_stamp():
     # timestamp stable, triable
