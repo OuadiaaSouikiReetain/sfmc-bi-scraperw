@@ -37,8 +37,8 @@ jobs:
           FTP_PORT: ${{ secrets.FTP_PORT }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          INCOMING_DIR: /bi/incoming
-          OUT_DIR: /bi/out
-          ARCHIVE_DIR: /bi/archive
-          PROCESSED_LOG: /bi/processed/processed.log
+          INCOMING_DIR: /Import/bi/incoming
+          OUT_DIR: /Import/bi/out
+          ARCHIVE_DIR: /Import/bi/archive
+          PROCESSED_LOG: /Import/bi/processed/processed.log
         run: python xml_to_csv_ftp.py
