@@ -3,17 +3,17 @@
 BI XML -> CSV (SFMC SFTP)
 ========================
 - Reads XML files from INCOMING_DIR (SFTP)
-- Skips already processed files using PROCESSED_LOG
-- Converts PROGRAMME blocks to CSV (string ops, same logic style as CloudPage)
-- Uploads CSV with unique timestamp name to OUT_DIR
-- Archives XML to ARCHIVE_DIR with unique timestamp name
+- Skips already processed files using a processed log (PROCESSED_LOG)
+- Converts PROGRAMME blocks to CSV (string logic like CloudPage)
+- Uploads CSV to OUT_DIR with SAME name as XML (only .xml -> .csv)
+- Archives XML to ARCHIVE_DIR (move file, same name)
 """
 
 import csv
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from io import BytesIO, StringIO
 
 import paramiko
@@ -21,11 +21,12 @@ import paramiko
 # =============================================================================
 # CONFIG (override via GitHub Actions env)
 # =============================================================================
-FTP_HOST     = os.environ.get("FTP_HOST", "")
+FTP_HOST     = os.environ.get("FTP_HOST",     "mct8vv9h4h0gy1x8xmv8np06rlpy.ftp.marketingcloudops.com")
 FTP_PORT     = int(os.environ.get("FTP_PORT", "22"))
-FTP_USERNAME = os.environ.get("FTP_USERNAME", "")
+FTP_USERNAME = os.environ.get("FTP_USERNAME", "536005700_7")
 FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "")
 
+# ✅ Your real SFMC FTP structure (root has /bi)
 INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/bi/incoming")
 OUT_DIR       = os.environ.get("OUT_DIR",       "/bi/out")
 ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/bi/archive")
@@ -50,10 +51,6 @@ CSV_COLUMNS = [
 # =============================================================================
 # UTIL
 # =============================================================================
-def utc_stamp():
-    # timezone-aware UTC timestamp (no deprecation warning)
-    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-
 def safe_join(dir_path, filename):
     return dir_path.rstrip("/") + "/" + filename
 
@@ -81,7 +78,7 @@ def ftp_connect():
     print("[FTP] Connected")
     return transport, sftp
 
-def ftp_list_dir(sftp, path, limit=200):
+def ftp_list_dir(sftp, path, limit=100):
     try:
         items = sftp.listdir_attr(path)
         print(f"[FTP] ls {path} -> {len(items)} item(s)")
@@ -358,8 +355,6 @@ def ftp_list_incoming_xml(sftp):
 def main():
     print("=" * 60)
     print("[BOOT] BI XML to CSV Converter for SFMC")
-    print("[BOOT] FTP_HOST      =", FTP_HOST)
-    print("[BOOT] FTP_USERNAME  =", FTP_USERNAME)
     print("[BOOT] INCOMING_DIR  =", INCOMING_DIR)
     print("[BOOT] OUT_DIR       =", OUT_DIR)
     print("[BOOT] ARCHIVE_DIR   =", ARCHIVE_DIR)
@@ -367,13 +362,13 @@ def main():
     print("=" * 60)
 
     if not FTP_PASSWORD:
-        print("ERROR: FTP_PASSWORD not set.")
+        print("ERROR: FTP_PASSWORD not set (GitHub Secrets).")
         sys.exit(1)
 
     transport, sftp = ftp_connect()
 
     try:
-        # Debug visibility (confirms folders & files exist)
+        # Debug visibility
         ftp_list_dir(sftp, "/")
         ftp_list_dir(sftp, "/bi")
         ftp_list_dir(sftp, INCOMING_DIR)
@@ -394,36 +389,41 @@ def main():
             return
 
         for filename, mtime, size in to_process:
-            stamp = utc_stamp()
             xml_path = safe_join(INCOMING_DIR, filename)
 
             print("-" * 60)
             print(f"[PROCESS] {xml_path} ({size} bytes)")
 
+            # Download XML
             xml_content = ftp_download(sftp, xml_path)
-            programs = parse_xml(xml_content)
 
+            # Parse
+            programs = parse_xml(xml_content)
             if not programs:
                 print("[WARN] No valid programs. Marking as processed anyway.")
                 mark_processed(sftp, filename)
                 continue
 
+            # CSV content
             csv_content = programs_to_csv(programs)
 
-            csv_name = f"PartenaireBI_{stamp}.csv"
+            # ✅ CSV name = same as XML, only .xml -> .csv
+            csv_name = filename.rsplit(".", 1)[0] + ".csv"
             csv_path = safe_join(OUT_DIR, csv_name)
 
+            # Upload CSV
             ftp_upload_text(sftp, csv_path, csv_content)
             print(f"[OUT] CSV uploaded -> {csv_path}")
 
-            # ✅ proof in logs that it exists in /bi/out
+            # Proof listing
             ftp_list_dir(sftp, OUT_DIR)
 
+            # Mark processed (store XML name)
             mark_processed(sftp, filename)
             print(f"[STATE] processed -> {filename}")
 
-            archived_name = f"{filename.rsplit('.', 1)[0]}_{stamp}.xml"
-            archive_path = safe_join(ARCHIVE_DIR, archived_name)
+            # ✅ Archive XML (move, same filename)
+            archive_path = safe_join(ARCHIVE_DIR, filename)
             try:
                 ftp_rename(sftp, xml_path, archive_path)
                 print(f"[ARCHIVE] XML moved -> {archive_path}")
