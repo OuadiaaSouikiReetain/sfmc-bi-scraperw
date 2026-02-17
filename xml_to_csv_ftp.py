@@ -3,17 +3,17 @@
 BI XML -> CSV (SFMC SFTP)
 ========================
 - Reads XML files from INCOMING_DIR (SFTP)
-- Skips already processed files using a processed log (PROCESSED_LOG)
-- Converts PROGRAMME blocks to CSV (same string-based logic as CloudPage)
-- Uploads CSV with a unique timestamp name to OUT_DIR
-- Archives XML to ARCHIVE_DIR with a unique timestamp name
+- Skips already processed files using PROCESSED_LOG
+- Converts PROGRAMME blocks to CSV (string ops, same logic style as CloudPage)
+- Uploads CSV with unique timestamp name to OUT_DIR
+- Archives XML to ARCHIVE_DIR with unique timestamp name
 """
 
 import csv
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO, StringIO
 
 import paramiko
@@ -21,16 +21,15 @@ import paramiko
 # =============================================================================
 # CONFIG (override via GitHub Actions env)
 # =============================================================================
-FTP_HOST     = os.environ.get("FTP_HOST",     "mct8vv9h4h0gy1x8xmv8np06rlpy.ftp.marketingcloudops.com")
+FTP_HOST     = os.environ.get("FTP_HOST", "")
 FTP_PORT     = int(os.environ.get("FTP_PORT", "22"))
-FTP_USERNAME = os.environ.get("FTP_USERNAME", "536005700_7")
+FTP_USERNAME = os.environ.get("FTP_USERNAME", "")
 FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "")
 
-# SFMC Enhanced FTP is often /Import (case-sensitive). Adjust if yours differs.
-INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/Import/bi/incoming")
-OUT_DIR       = os.environ.get("OUT_DIR",       "/Import/bi/out")
-ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/Import/bi/archive")
-PROCESSED_LOG = os.environ.get("PROCESSED_LOG", "/Import/bi/processed/processed.log")
+INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/bi/incoming")
+OUT_DIR       = os.environ.get("OUT_DIR",       "/bi/out")
+ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/bi/archive")
+PROCESSED_LOG = os.environ.get("PROCESSED_LOG", "/bi/processed/processed.log")
 
 XML_PATTERN = re.compile(r".*\.xml$", re.IGNORECASE)
 
@@ -52,16 +51,14 @@ CSV_COLUMNS = [
 # UTIL
 # =============================================================================
 def utc_stamp():
-    return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    # timezone-aware UTC timestamp (no deprecation warning)
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 def safe_join(dir_path, filename):
     return dir_path.rstrip("/") + "/" + filename
 
 def ensure_remote_dirs(sftp, full_path):
-    """
-    Ensure all parent directories exist for a file path.
-    full_path is a file path (not a directory path).
-    """
+    """Ensure all parent directories exist for a file path."""
     parts = full_path.strip("/").split("/")
     for i in range(len(parts) - 1):
         dir_path = "/" + "/".join(parts[:i+1])
@@ -84,14 +81,14 @@ def ftp_connect():
     print("[FTP] Connected")
     return transport, sftp
 
-def ftp_list_dir(sftp, path):
+def ftp_list_dir(sftp, path, limit=200):
     try:
         items = sftp.listdir_attr(path)
         print(f"[FTP] ls {path} -> {len(items)} item(s)")
-        for it in items[:50]:
+        for it in items[:limit]:
             kind = "DIR" if it.longname.startswith("d") else "FILE"
             print(f"      [{kind}] {it.filename} ({it.st_size} bytes)")
-        if len(items) > 50:
+        if len(items) > limit:
             print("      ... (truncated)")
         return items
     except Exception as e:
@@ -149,7 +146,7 @@ def mark_processed(sftp, filename):
     ftp_write_text(sftp, PROCESSED_LOG, existing)
 
 # =============================================================================
-# XML HELPERS — mirrors CloudPage logic (string ops)
+# XML HELPERS — string ops (CloudPage-like)
 # =============================================================================
 def decode_xml(v):
     if not v:
@@ -256,7 +253,7 @@ def cut(v, n):
     return v[:n] if len(v) > n else v
 
 # =============================================================================
-# MAIN PARSER
+# PARSER
 # =============================================================================
 def parse_xml(raw):
     end = raw.find("</REPONSE>")
@@ -370,17 +367,18 @@ def main():
     print("=" * 60)
 
     if not FTP_PASSWORD:
-        print("ERROR: FTP_PASSWORD not set (GitHub Secrets).")
+        print("ERROR: FTP_PASSWORD not set.")
         sys.exit(1)
 
     transport, sftp = ftp_connect()
 
     try:
-        # Optional quick visibility (helps debug paths)
+        # Debug visibility (confirms folders & files exist)
         ftp_list_dir(sftp, "/")
-        ftp_list_dir(sftp, "/Import")
-        ftp_list_dir(sftp, "/Import/bi")
+        ftp_list_dir(sftp, "/bi")
         ftp_list_dir(sftp, INCOMING_DIR)
+        ftp_list_dir(sftp, OUT_DIR)
+        ftp_list_dir(sftp, ARCHIVE_DIR)
 
         processed = load_processed_set(sftp)
         print(f"[STATE] Already processed: {len(processed)}")
@@ -411,18 +409,20 @@ def main():
                 continue
 
             csv_content = programs_to_csv(programs)
+
             csv_name = f"PartenaireBI_{stamp}.csv"
             csv_path = safe_join(OUT_DIR, csv_name)
 
             ftp_upload_text(sftp, csv_path, csv_content)
             print(f"[OUT] CSV uploaded -> {csv_path}")
 
-            # mark processed
+            # ✅ proof in logs that it exists in /bi/out
+            ftp_list_dir(sftp, OUT_DIR)
+
             mark_processed(sftp, filename)
             print(f"[STATE] processed -> {filename}")
 
-            # archive xml (rename/move)
-            archived_name = f"{filename.rsplit('.',1)[0]}_{stamp}.xml"
+            archived_name = f"{filename.rsplit('.', 1)[0]}_{stamp}.xml"
             archive_path = safe_join(ARCHIVE_DIR, archived_name)
             try:
                 ftp_rename(sftp, xml_path, archive_path)
