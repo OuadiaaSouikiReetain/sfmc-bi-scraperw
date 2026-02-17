@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+
+import csv
+import os
+import re
+import sys
+from datetime import datetime
+from io import BytesIO, StringIO
+
+import paramiko
+
+
+
+
 # =============================================================================
 # CONFIG (ajoute ça en haut)
 # =============================================================================
