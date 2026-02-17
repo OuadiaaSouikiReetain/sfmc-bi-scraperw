@@ -27,10 +27,10 @@ FTP_USERNAME = os.environ.get("FTP_USERNAME", "536005700_7")
 FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "")
 
 # SFMC Enhanced FTP is often /Import (case-sensitive). Adjust if yours differs.
-INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/bi/incoming")
-OUT_DIR       = os.environ.get("OUT_DIR",       "/bi/out")
-ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/bi/archive")
-PROCESSED_LOG = os.environ.get("PROCESSED_LOG", "/bi/processed/processed.log")
+INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/Import/bi/incoming")
+OUT_DIR       = os.environ.get("OUT_DIR",       "/Import/bi/out")
+ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/Import/bi/archive")
+PROCESSED_LOG = os.environ.get("PROCESSED_LOG", "/Import/bi/processed/processed.log")
 
 XML_PATTERN = re.compile(r".*\.xml$", re.IGNORECASE)
 
@@ -378,8 +378,8 @@ def main():
     try:
         # Optional quick visibility (helps debug paths)
         ftp_list_dir(sftp, "/")
-        ftp_list_dir(sftp, "/")
-        ftp_list_dir(sftp, "/bi")
+        ftp_list_dir(sftp, "/Import")
+        ftp_list_dir(sftp, "/Import/bi")
         ftp_list_dir(sftp, INCOMING_DIR)
 
         processed = load_processed_set(sftp)
