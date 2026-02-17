@@ -1,15 +1,11 @@
 name: BI XML → SFMC CSV
 
 on:
-  # ✅ Déclenchement depuis SFMC (ton script POST /dispatches)
   repository_dispatch:
     types: [xml-uploaded]
 
-  # ✅ Déclenchement manuel depuis l'UI GitHub
   workflow_dispatch:
 
-  # ✅ Optionnel : polling toutes les 30 minutes
-  # (garde-le seulement si tu veux une sécurité en plus)
   schedule:
     - cron: "*/30 * * * *"
 
@@ -37,8 +33,11 @@ jobs:
           FTP_PORT: ${{ secrets.FTP_PORT }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          INCOMING_DIR: /Import/bi/incoming
-          OUT_DIR: /Import/bi/out
-          ARCHIVE_DIR: /Import/bi/archive
-          PROCESSED_LOG: /Import/bi/processed/processed.log
+
+          # ✅ Ton arborescence réelle (racine / -> /bi/...)
+          INCOMING_DIR: /bi/incoming
+          OUT_DIR: /bi/out
+          ARCHIVE_DIR: /bi/archive
+          PROCESSED_LOG: /bi/processed/processed.log
+
         run: python xml_to_csv_ftp.py
