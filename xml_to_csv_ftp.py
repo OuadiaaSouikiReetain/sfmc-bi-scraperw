@@ -181,3 +181,7 @@ def main():
             sftp.close()
         finally:
             transport.close()
+
+if __name__ == "__main__":
+    main()
+
