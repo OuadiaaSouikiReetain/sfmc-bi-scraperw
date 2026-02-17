@@ -1,10 +1,10 @@
 # =============================================================================
 # CONFIG (ajoute ça en haut)
 # =============================================================================
-INCOMING_DIR   = os.environ.get("INCOMING_DIR", "/import/bi/incoming")
-OUT_DIR        = os.environ.get("OUT_DIR",      "/Import/bi/out")
-ARCHIVE_DIR    = os.environ.get("ARCHIVE_DIR",  "/import/bi/archive")
-PROCESSED_LOG  = os.environ.get("PROCESSED_LOG","/import/bi/processed/processed.log")
+INCOMING_DIR   = os.environ.get("INCOMING_DIR", "/bi/incoming")
+OUT_DIR        = os.environ.get("OUT_DIR",      "/bi/out")
+ARCHIVE_DIR    = os.environ.get("ARCHIVE_DIR",  "/bi/archive")
+PROCESSED_LOG  = os.environ.get("PROCESSED_LOG","/bi/processed/processed.log")
 
 XML_PATTERN = re.compile(r".*\.xml$", re.IGNORECASE)
 
