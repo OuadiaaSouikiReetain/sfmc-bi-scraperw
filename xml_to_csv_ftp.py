@@ -10,6 +10,7 @@ import re
 import sys
 from datetime import datetime
 from io import BytesIO
+from urllib.parse import urlparse
 
 import paramiko
 import requests
@@ -112,14 +113,37 @@ def list_incoming_xml(sftp):
 # SFMC REST API - ASYNC VERSION
 # =============================================================================
 
+def build_https_url(base_uri, path):
+    """
+    Build a valid https URL from:
+    - host-only input: mctxxxx.auth.marketingcloudapis.com
+    - full URL input:  https://mctxxxx.auth.marketingcloudapis.com
+    """
+    raw = (base_uri or "").strip()
+    if not raw:
+        return ""
+
+    if raw.startswith(("http://", "https://")):
+        parsed = urlparse(raw)
+        if parsed.netloc:
+            base = f"https://{parsed.netloc}"
+        else:
+            # Defensive fallback for malformed values
+            cleaned = raw.replace("http://", "").replace("https://", "").strip("/")
+            base = f"https://{cleaned}"
+    else:
+        base = f"https://{raw.strip('/')}"
+
+    return f"{base.rstrip('/')}/{path.lstrip('/')}"
+
 def sfmc_auth():
-    url = f"https://{SFMC_AUTH_BASE_URI}/v2/token"
-    print("[API] Authenticating...")
+    url = build_https_url(SFMC_AUTH_BASE_URI, "/v2/token")
+    print(f"[API] Authenticating at {urlparse(url).netloc} ...")
     resp = requests.post(url, json={
         "grant_type": "client_credentials",
         "client_id": SFMC_CLIENT_ID,
         "client_secret": SFMC_CLIENT_SECRET,
-    })
+    }, timeout=30)
     resp.raise_for_status()
     token = resp.json()["access_token"]
     print("[API] Authenticated")
@@ -127,7 +151,7 @@ def sfmc_auth():
 
 def sfmc_insert_batch_async(token, rows):
     """Insert rows using the async Data Extension API"""
-    url = f"https://{SFMC_REST_BASE_URI}/data/v1/async/dataextensions/key:{DE_EXTERNAL_KEY}/rows"
+    url = build_https_url(SFMC_REST_BASE_URI, f"/data/v1/async/dataextensions/key:{DE_EXTERNAL_KEY}/rows")
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
