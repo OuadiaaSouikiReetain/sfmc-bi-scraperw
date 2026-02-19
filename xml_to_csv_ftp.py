@@ -8,8 +8,9 @@ Uses the async Data Extension API which doesn't require primary key specificatio
 import os
 import re
 import sys
+import csv
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from urllib.parse import urlparse
 
 import paramiko
@@ -30,6 +31,7 @@ SFMC_AUTH_BASE_URI = os.environ.get("SFMC_AUTH_BASE_URI", "")
 SFMC_REST_BASE_URI = os.environ.get("SFMC_REST_BASE_URI", "")
 
 INCOMING_DIR  = os.environ.get("INCOMING_DIR",  "/bi/incoming")
+OUT_DIR       = os.environ.get("OUT_DIR",       "/bi/out")
 ARCHIVE_DIR   = os.environ.get("ARCHIVE_DIR",   "/bi/archive")
 PROCESSED_LOG = os.environ.get("PROCESSED_LOG", "/bi/processed/processed.log")
 
@@ -38,6 +40,20 @@ DE_EXTERNAL_KEY = "358E9826-DCC9-4611-98F1-233E639B96D3"
 BATCH_SIZE = 50
 
 XML_PATTERN = re.compile(r".*\.xml$", re.IGNORECASE)
+
+CSV_COLUMNS = [
+    "Program_URL",
+    "Program_Ref",
+    "Program_Name",
+    "Program_City",
+    "Program_ZipCode",
+    "Program_Department",
+    "Program_Arguments",
+    "Scraping_Date",
+    "Scraping_Status",
+    "Error_Message",
+    "Program_Image",
+]
 
 # =============================================================================
 # FTP HELPERS
@@ -70,6 +86,13 @@ def ftp_download(sftp, path):
     content = buf.getvalue().decode("utf-8", errors="replace")
     print(f"[FTP] {len(content):,} chars")
     return content
+
+def ftp_upload_text(sftp, path, content):
+    ensure_remote_dirs(sftp, path)
+    data = content.encode("utf-8")
+    print(f"[FTP] Uploading {path} ({len(data):,} bytes)...")
+    sftp.putfo(BytesIO(data), path)
+    print("[FTP] Upload complete")
 
 def ftp_rename(sftp, src, dst):
     ensure_remote_dirs(sftp, dst)
@@ -201,6 +224,14 @@ def sfmc_insert_all(token, programs):
 
     print(f"[API] Total: {total_ok} OK, {total_err} errors")
     return total_ok, total_err
+
+def programs_to_csv(programs):
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS, quoting=csv.QUOTE_ALL)
+    writer.writeheader()
+    for p in programs:
+        writer.writerow(p)
+    return output.getvalue()
 
 # =============================================================================
 # XML HELPERS
@@ -355,6 +386,7 @@ def main():
         sys.exit(1)
 
     print(f"[CONFIG] DE External Key: {DE_EXTERNAL_KEY}")
+    print(f"[CONFIG] OUT_DIR: {OUT_DIR}")
 
     # Connect FTP
     transport, sftp = ftp_connect()
@@ -404,6 +436,13 @@ def main():
             # Insert to DE via async API
             ok, err = sfmc_insert_all(token, programs)
             print(f"[RESULT] {ok} rows submitted, {err} errors")
+
+            # CSV traceability in /bi/out with same file name as XML
+            csv_name = filename.rsplit(".", 1)[0] + ".csv"
+            csv_path = safe_join(OUT_DIR, csv_name)
+            csv_content = programs_to_csv(programs)
+            ftp_upload_text(sftp, csv_path, csv_content)
+            print(f"[OUT] CSV uploaded: {csv_path}")
 
             # Mark processed
             mark_processed(sftp, filename, size, mtime)
