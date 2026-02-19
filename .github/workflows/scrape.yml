@@ -23,21 +23,19 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install paramiko
+        run: pip install paramiko requests
 
-      - name: Run XML → CSV converter (SFTP)
+      - name: Run XML → DE pipeline
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_PORT: ${{ secrets.FTP_PORT }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-
-          # ✅ Ton arborescence réelle (racine / -> /bi/...)
+          SFMC_CLIENT_ID: ${{ secrets.SFMC_CLIENT_ID }}
+          SFMC_CLIENT_SECRET: ${{ secrets.SFMC_CLIENT_SECRET }}
+          SFMC_AUTH_BASE_URI: ${{ secrets.SFMC_AUTH_BASE_URI }}
+          SFMC_REST_BASE_URI: ${{ secrets.SFMC_REST_BASE_URI }}
           INCOMING_DIR: /bi/incoming
-          OUT_DIR: /bi/out
           ARCHIVE_DIR: /bi/archive
           PROCESSED_LOG: /bi/processed/processed.log
-
         run: python xml_to_csv_ftp.py
